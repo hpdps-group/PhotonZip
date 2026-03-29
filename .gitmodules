@@ -1,0 +1,3 @@
+[submodule "MANS"]
+	path = MANS
+	url = https://github.com/hpdps-group/MANS.git
