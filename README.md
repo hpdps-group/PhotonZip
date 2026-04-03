@@ -44,7 +44,7 @@ python3 -m pip install -e . --no-deps
 
 ## 🧪 Examples
 
-See [`examples/python`](./examples/python/):
+See [`examples`](./examples):
 
 ## 🧾 Citation
 
