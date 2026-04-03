@@ -1,0 +1,14 @@
+[build-system]
+requires = ["scikit-build-core>=0.10", "pybind11>=2.11"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "photonzip"
+version = "0.1.0"
+description = "Python bindings for PhotonZip codecs"
+readme = "README.md"
+requires-python = ">=3.9"
+
+[tool.scikit-build]
+cmake.source-dir = "."
+wheel.packages = ["python/photonzip"]
