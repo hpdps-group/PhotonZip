@@ -46,29 +46,6 @@ python3 -m pip install -e . --no-deps
 
 See [`examples/python`](./examples/python/):
 
-- `cpu_roundtrip.py`
-- `cpu_multidim.py`
-- `cuda_host_input.py`
-- `cuda_device_input.py`
-- `autotune_to_csv.py`
-- `compress_with_csv.py`
-
-These examples cover:
-
-- CPU round-trip
-- multi-dimensional tensors
-- CUDA host input
-- CUDA device input
-- MANS autotune to CSV
-- compression with a saved thread CSV
-
-Each example uses the repository dataset:
-
-- `testdata/u2/exafel/exafel_59200x388_16384kB.u2`
-
-By default, `MansOptions()` uses `mode="p"`.
-Use `mode="r"` only when you explicitly want MANS R-mode.
-
 ## 🧾 Citation
 
 
