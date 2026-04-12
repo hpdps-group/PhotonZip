@@ -1,25 +1,54 @@
-from importlib import import_module
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
 
 
-try:
-    _native = import_module("photonzip._native")
-except ModuleNotFoundError:
-    _native = import_module("_native")
+class Codec(ABC):
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        raise NotImplementedError
+
+    @abstractmethod
+    def compress(
+        self,
+        tensor,
+        *,
+        backend="auto",
+        codec_params=None,
+        codec_options=None,
+    ):
+        raise NotImplementedError
+
+    @abstractmethod
+    def decompress(self, data, *, backend="auto", **kwargs):
+        raise NotImplementedError
+
+    def invoke(self, operation, request=None):
+        raise NotImplementedError(f"Codec {self.name!r} does not implement operation {operation!r}.")
+
+
+from .codec import discover_codecs
+from .codec_registry import get_codec_handler, list_registered_codecs
+
+
+discover_codecs()
 
 
 def list_codecs():
-    return _native.list_codecs()
+    return list_registered_codecs()
 
 
 def invoke_codec(codec, operation, request=None):
-    if request is None:
-        request = {}
-    return _native.invoke_codec(codec, operation, request=request)
+    handler = get_codec_handler(codec)
+    if handler is None:
+        raise ValueError(f"Unknown codec: {codec!r}.")
+    return handler.invoke(operation, request=request)
 
 
 def compress(
     tensor,
-    codec=None,
+    codec="mans",
     backend="auto",
     codec_params=None,
     codec_options=None,
@@ -28,27 +57,34 @@ def compress(
         raise TypeError("Pass either codec_params or codec_options, not both.")
 
     if codec_options is not None:
-        if not hasattr(codec_options, "to_codec_params") or not hasattr(codec_options, "codec"):
-            raise TypeError("codec_options must provide codec and to_codec_params().")
+        if not hasattr(codec_options, "codec"):
+            raise TypeError("codec_options must provide codec.")
         if codec is not None and codec != codec_options.codec:
             raise ValueError(
                 f"codec={codec!r} does not match codec_options.codec={codec_options.codec!r}."
             )
         codec = codec_options.codec
-        codec_params = codec_options.to_codec_params(tensor=tensor)
-
-    if codec is None:
-        codec = "mans"
-
-    if codec_params is None:
-        codec_params = []
-    return _native.compress_tensor(codec, tensor, backend=backend, codec_params=codec_params)
 
 
-def decompress(data, **kwargs):
-    import torch
+    handler = get_codec_handler(codec)
+    if handler is None:
+        raise ValueError(f"Unknown codec: {codec!r}.")
+    return handler.compress(
+        tensor,
+        backend=backend,
+        codec_params=codec_params,
+        codec_options=codec_options,
+    )
 
-    return torch.from_dlpack(_native.decompress_tensor(data, **kwargs))
+
+def decompress(data, backend="auto", codec=None, **kwargs):
+    codec_name = codec if codec is not None else getattr(data, "codec", None)
+    if codec_name is None:
+        raise ValueError("Unable to determine codec for decompression. Pass codec explicitly.")
+    handler = get_codec_handler(codec_name)
+    if handler is None:
+        raise ValueError(f"Unknown codec: {codec_name!r}.")
+    return handler.decompress(data, backend=backend, **kwargs)
 
 
 compress_tensor = compress

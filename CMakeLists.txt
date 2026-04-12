@@ -11,7 +11,7 @@ option(PHOTONZIP_BUILD_PYTHON "Build the PhotonZip Python extension module" ON)
 set(PHOTONZIP_MANS_TARGET_PLATFORM "cpu_nv" CACHE STRING "Forwarded TARGET_PLATFORM for the vendored MANS build")
 
 if(NOT TARGET mans_common)
-  set(BUILD_HDF5_PLUGIN OFF CACHE BOOL "Build the vendored HDF5 plugin" FORCE)
+  set(BUILD_HDF5_PLUGIN ON CACHE BOOL "Build the vendored HDF5 plugin" FORCE)
   set(TARGET_PLATFORM "${PHOTONZIP_MANS_TARGET_PLATFORM}" CACHE STRING "Target platform to build: cpu / nv / amd / all / cpu_nv / cpu_amd" FORCE)
   add_subdirectory(3rdparty/lossless/MANS)
 endif()

@@ -6,12 +6,13 @@ The current backend is [MANS](https://github.com/hpdps-group/MANS), exposed thro
 
 - `photonzip.compress(...)`
 - `photonzip.decompress(...)`
-- `photonzip.mans.autotune(...)`
+- `photonzip.codec.mans.autotune(...)`
 
-Internally, the Python layer is DLPack-based, and `decompress(...)` returns a `torch.Tensor`.
+Internally, the Python layer is DLPack-based, and `decompress(...)` returns a `PhotonZipArray`.
 
-## 🚀 Clone
 
+## 🔧 Install
+**Clone the repo with submodules:**
 ```bash
 git clone --recurse-submodules https://github.com/hpdps-group/PhotonZip.git
 cd PhotonZip
@@ -23,7 +24,7 @@ If you already cloned without submodules:
 git submodule update --init --recursive
 ```
 
-## 🔧 Install
+**Pip install:**
 
 ```bash
 python3 -m pip install .
@@ -35,16 +36,47 @@ For local development:
 python3 -m pip install -e . --no-deps
 ```
 
-## 📋 Requirements
+## 📋 Environment Setup
 
-- Python 3.9+
-- A working C++ toolchain
-- CUDA toolkit if you want `backend="cuda"`
-- `torch` installed in your Python environment
 
-## 🧪 Examples
+```bash
+conda create -n photonzip python=3.12 pytorch::pytorch pytorch::pytorch-cuda=12.1 -c pytorch -c conda-forge
+conda activate photonzip
+```
 
-See [`examples`](./examples):
+
+## 🧪 Usage
+```bash
+cd examples/MANS
+python autotune_to_csv.py
+python cpu_roundtrip_autotune.py
+python nv_roundtrip.py
+```
+Expected output see [here](./examples/MANS/README.md).
+
+
+More examples are available in [`examples`](./examples).
+
+## 📊 Performance
+
+### CPU Compression Throughput
+
+![CPU compression throughput](./images/cpuTHR-CMP.png)
+
+### CPU Decompression Throughput
+
+![CPU decompression throughput](./images/cpuTHR-DECMP.png)
+### NV Compression Throughput
+
+![NV compression throughput](./images/gpu_cmp.png)
+
+### NV Decompression Throughput
+
+![NV decompression throughput](./images/gpu_decmp.png)
+
+### Compression Ratio
+
+![Compression Ratio](./images/CR.png)
 
 ## 🧾 Citation
 
@@ -53,13 +85,14 @@ See [`examples`](./examples):
 
 ## 🕰️ History
 
+- `2026-04-12`: Add HDF5 Python support for MANS.
 - `2026-04-03`: Integrated MANS CPU and GPU paths into the tensor-first Python framework。
 
 
-## ✅ Tests
+<!-- ## ✅ Tests
 
 Run:
 
 ```bash
 pytest -q tests/python/test_codecs.py
-```
+``` -->

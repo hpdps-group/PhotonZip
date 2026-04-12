@@ -1,0 +1,36 @@
+{
+  "source_path": "/workspace/MANS/datasets/testdata/u2/spdi-m/spdi-m_841x511x1024_859502kB.u2",
+  "dtype": "uint16",
+  "offset_bytes": 0,
+  "order": "C",
+  "full_shape_zyx": [
+    841,
+    511,
+    1024
+  ],
+  "budget": "4MB",
+  "budget_bytes": 4194304,
+  "chosen_block_shape_zyx": [
+    127,
+    127,
+    127
+  ],
+  "chosen_block_bytes": 4096766,
+  "ranges_zyx": {
+    "z": [
+      0,
+      127
+    ],
+    "y": [
+      0,
+      127
+    ],
+    "x": [
+      0,
+      127
+    ]
+  },
+  "out_file": "/workspace/MANS/datasets/testdata/u2/spdi-m/spdi-m_841x511x1024_859502kB_127x127x127_4096kB.u2",
+  "min": 0,
+  "max": 45
+}
