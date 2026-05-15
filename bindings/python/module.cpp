@@ -110,6 +110,19 @@ std::string dtype_name(DataType dtype) {
   throw Error("Unsupported PhotonZip dtype.");
 }
 
+DataType parse_dtype_name(const std::string& value) {
+  if (value == "uint8") {
+    return DataType::kUInt8;
+  }
+  if (value == "uint16") {
+    return DataType::kUInt16;
+  }
+  if (value == "uint32") {
+    return DataType::kUInt32;
+  }
+  throw Error("Unsupported PhotonZip dtype: " + value);
+}
+
 Backend parse_backend(const std::string& value, Backend inferred_backend) {
   if (value == "auto") {
     return inferred_backend;
@@ -476,6 +489,34 @@ PhotonZipArray decompress_tensor(const PhotonZipArray& input,
   return PhotonZipArray(make_uncompressed_state(input, output));
 }
 
+PhotonZipArray compressed_from_bytes(const std::string& codec_name,
+                                     py::bytes payload,
+                                     const std::string& dtype_name_value,
+                                     const std::vector<std::uint32_t>& shape,
+                                     const std::string& backend,
+                                     std::vector<std::uint32_t> codec_params) {
+  std::string payload_bytes = payload;
+  Buffer buffer = make_host_buffer(payload_bytes.size());
+  if (!payload_bytes.empty()) {
+    std::memcpy(buffer.mutable_bytes(), payload_bytes.data(), payload_bytes.size());
+  }
+
+  CodecOptions options;
+  options.backend = parse_backend(backend, Backend::kCpu);
+  options.dtype = parse_dtype_name(dtype_name_value);
+  options.shape = shape;
+  options.codec_params = std::move(codec_params);
+  options.element_count = 1;
+  for (const auto dim : options.shape) {
+    if (dim == 0) {
+      throw Error("Compressed tensor shape values must be positive.");
+    }
+    options.element_count = checked_product(options.element_count, static_cast<std::size_t>(dim), "element count");
+  }
+
+  return PhotonZipArray(make_compressed_state(codec_name, options, std::move(buffer)));
+}
+
 py::object invoke_codec(const std::string& codec_name,
                         const std::string& op_name,
                         py::object request) {
@@ -549,6 +590,15 @@ PYBIND11_MODULE(_native, module) {
       &photonzip::decompress_tensor,
       py::arg("input"),
       py::arg("backend") = "auto");
+  module.def(
+      "compressed_from_bytes",
+      &photonzip::compressed_from_bytes,
+      py::arg("codec_name"),
+      py::arg("payload"),
+      py::arg("dtype"),
+      py::arg("shape"),
+      py::arg("backend"),
+      py::arg("codec_params") = std::vector<std::uint32_t>{});
   module.def(
       "invoke_codec",
       &photonzip::invoke_codec,

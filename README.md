@@ -46,13 +46,63 @@ conda activate photonzip
 
 
 ## 🧪 Usage
+
+### CPU Compress
+#### high throughtput
 ```bash
-cd examples/MANS
-python autotune_to_csv.py
-python cpu_roundtrip_autotune.py
-python nv_roundtrip.py
+python examples/photonzip_cli.py \
+  --mode compress \
+  --input testdata/u2/sfc-gi/sfc-gi_127x127x127_4096kB.u2 \
+  --output /tmp/photonzip_cpu.pzc \
+  --dims 127 127 127 \
+  --dtype uint16 \
+  --backend cpu \
+  --quality-level lossless \
+  --throughput-level high
 ```
-Expected output see [here](./examples/MANS/README.md).
+#### high compression ratio
+```bash
+python examples/photonzip_cli.py \
+  --mode compress \
+  --input testdata/u2/sfc-gi/sfc-gi_127x127x127_4096kB.u2 \
+  --output /tmp/photonzip_cpu.pzc \
+  --dims 127 127 127 \
+  --dtype uint16 \
+  --backend cpu \
+  --quality-level lossless \
+  --ratio-level high
+```
+### CPU Decompress
+```bash
+python examples/photonzip_cli.py \
+  --mode decompress \
+  --input /tmp/photonzip_cpu.pzc \
+  --output /tmp/photonzip_cpu_restored.u2 \
+  --backend cpu
+```
+
+### CUDA Roundtrip
+```bash
+python examples/photonzip_cli.py \
+  --mode roundtrip \
+  --input testdata/u2/sfc-gi/sfc-gi_127x127x127_4096kB.u2 \
+  --output /tmp/photonzip_cuda.pzc \
+  --dims 127 127 127 \
+  --dtype uint16 \
+  --backend cuda \
+  --quality-level lossless \
+  --throughput-level high
+```
+
+The CLI prints throughput for the requested mode:
+
+- `compress`: compression throughput and compression ratio
+- `decompress`: decompression throughput
+- `roundtrip`: compression throughput, decompression throughput, compression ratio, and equality check
+
+For lossless compression, the CLI uses MANS automatically. If `build/best_threads.csv` exists, it is reused; otherwise, the CLI runs MANS autotune once, writes that CSV, and then compresses with it. Use `--quality-level lossless|high|low`, `--throughput-level high|low`, and `--ratio-level high|low` to select compression levels. For MANS lossless mode, `--throughput-level high` selects p-mode, while `--ratio-level high` selects r-mode unless throughput is also set to high.
+
+The compressed output is a small self-describing container that stores the payload together with `codec`, `dtype`, `shape`, `backend`, and `codec_params`, so it can be decompressed later from disk.
 
 
 More examples are available in [`examples`](./examples).
