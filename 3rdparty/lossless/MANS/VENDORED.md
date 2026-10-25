@@ -28,6 +28,25 @@ All source changes are marked `[PhotonZip]`.
   the header geometry against the raw size, so autotune failed for every 2D/3D size off the
   tile grid. It now generates the full `nx*ny*nz` grid.
 
+`nv/adm/adm_kernel.cuh`, `nv/adm/mapping_uint16.cu`, `nv/adm/mapping_uint32.cu`
+- Port of the ADM patches of the `dcu` branch (`dcu/adm/`). Upstream packed the ADM payload
+  on the host (lengths, flags, centers, codes and the lane signal scratch copied to the host,
+  about a million small `memcpy` calls for 16 MiB) and decoded on the host
+  (`reference::decode`). The payload is now packed on the device (`offsets_kernel`,
+  `pack_meta_kernel`, `pack_signals_kernel`) and decoded by a device kernel, with an
+  incremental `TileCursor` instead of two 64-bit divisions per element and full-depth 3D tiles
+  staged through shared memory. The lane signal scratch is sized by the tile of the actual
+  rank (2D used the 3D tile size). Codes of RAW blocks are zeroed. The U32 entry points are
+  emitted by `mapping_uint16.cu`.
+
+`nv/mans_nv.cpp`, `nv/ans/mans_nv_ans.cu`, `nv/nv_workspace.h` (new)
+- Scratch memory comes from per-device, per-thread-safe workspaces (port of
+  `dcu/dcu_workspace.h`) instead of `cudaMalloc`/`cudaFree` on every call.
+
+The patched NVIDIA encoder writes streams byte-identical to the unmodified one (16 MiB EXAFEL
+2D, 256 MiB and 4 MiB 3D volumes, 4 MB random 1D, 2 MB uint32 2D). Device-resident on an
+RTX 5090 (compress / decompress), 16 MiB EXAFEL: 0.04 / 0.09 GB/s -> 21.0 / 92.3 GB/s.
+
 `tools/H5Z-MANS/CMakeLists.txt`
 - Include directories relative to the MANS directory instead of `CMAKE_SOURCE_DIR`, so the
   plugin builds as a subdirectory (from 197895/MANS commit 565c215).

@@ -8,6 +8,7 @@
 
 #include "ans/BatchPrefixSum.h"
 #include "ans/GpuANSCodec.h"
+#include "../nv_workspace.h"
 
 namespace multibyte_ans {
 void ansEncodeBatch(
@@ -87,27 +88,16 @@ void compress_stage_device(const std::uint8_t* d_input,
     const std::uint32_t prefix_temp_size =
         multibyte_ans::getBatchExclusivePrefixSumTempSize(max_num_compressed_blocks);
 
-    uint4* table_dev = nullptr;
-    std::uint32_t* temp_histogram_dev = nullptr;
-    std::uint8_t* compressed_blocks_dev = nullptr;
-    std::uint32_t* compressed_words_dev = nullptr;
-    std::uint32_t* compressed_words_prefix_dev = nullptr;
-    std::uint8_t* temp_prefix_sum_dev = nullptr;
-    std::uint32_t* out_size_dev = nullptr;
-
-    check_cuda(cudaMalloc(&table_dev, sizeof(uint4) * multibyte_ans::kNumSymbols), "cudaMalloc table_dev");
-    check_cuda(cudaMalloc(&temp_histogram_dev, sizeof(std::uint32_t) * multibyte_ans::kNumSymbols),
-               "cudaMalloc temp_histogram_dev");
-    check_cuda(cudaMalloc(&compressed_blocks_dev,
-                          sizeof(std::uint8_t) * max_num_compressed_blocks * uncoalesced_block_stride),
-               "cudaMalloc compressed_blocks_dev");
-    check_cuda(cudaMalloc(&compressed_words_dev, sizeof(std::uint32_t) * max_num_compressed_blocks),
-               "cudaMalloc compressed_words_dev");
-    check_cuda(cudaMalloc(&compressed_words_prefix_dev, sizeof(std::uint32_t) * max_num_compressed_blocks),
-               "cudaMalloc compressed_words_prefix_dev");
-    check_cuda(cudaMalloc(&temp_prefix_sum_dev, sizeof(std::uint8_t) * prefix_temp_size),
-               "cudaMalloc temp_prefix_sum_dev");
-    check_cuda(cudaMalloc(&out_size_dev, sizeof(std::uint32_t)), "cudaMalloc out_size_dev");
+    // [PhotonZip] scratch from a reusable workspace instead of cudaMalloc per call
+    WorkspaceLease ws(kAnsPool);
+    auto* table_dev = ws->get<uint4>(0, multibyte_ans::kNumSymbols);
+    auto* temp_histogram_dev = ws->get<std::uint32_t>(1, multibyte_ans::kNumSymbols);
+    auto* compressed_blocks_dev =
+        ws->get<std::uint8_t>(2, static_cast<std::size_t>(max_num_compressed_blocks) * uncoalesced_block_stride);
+    auto* compressed_words_dev = ws->get<std::uint32_t>(3, max_num_compressed_blocks);
+    auto* compressed_words_prefix_dev = ws->get<std::uint32_t>(4, max_num_compressed_blocks);
+    auto* temp_prefix_sum_dev = ws->get<std::uint8_t>(5, prefix_temp_size);
+    auto* out_size_dev = ws->get<std::uint32_t>(6, 1);
 
     multibyte_ans::ansEncodeBatch(
         in_size_u32,
@@ -133,14 +123,6 @@ void compress_stage_device(const std::uint8_t* d_input,
     check_cuda(cudaMemcpy(&out_size_u32, out_size_dev, sizeof(out_size_u32), cudaMemcpyDeviceToHost),
                "cudaMemcpy out_size D2H");
     output_size = static_cast<std::size_t>(out_size_u32);
-
-    cudaFree(table_dev);
-    cudaFree(temp_histogram_dev);
-    cudaFree(compressed_blocks_dev);
-    cudaFree(compressed_words_dev);
-    cudaFree(compressed_words_prefix_dev);
-    cudaFree(temp_prefix_sum_dev);
-    cudaFree(out_size_dev);
 }
 
 void decompress_stage_device(const std::uint8_t* d_input,

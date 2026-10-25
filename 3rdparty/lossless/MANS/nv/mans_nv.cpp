@@ -10,6 +10,7 @@
 #include "adm/mapping_uint16.h"
 #include "adm/mapping_uint32.h"
 #include "ans/mans_nv_ans.h"
+#include "nv_workspace.h"
 
 namespace mans {
 namespace nv {
@@ -137,16 +138,16 @@ void compress_internal_device(const void* d_input_data,
     const std::size_t max_entropy_bytes =
         mans::nv::ans::get_max_compress_bytes(max_adm_bytes, mode, params);
 
-    std::uint8_t* d_adm_payload = nullptr;
-    std::uint8_t* d_entropy_payload = nullptr;
     std::size_t adm_size = 0;
     std::size_t entropy_size = 0;
 
     std::uint8_t header_bytes[kMansHeaderBytes] = {};
     write_header(header_bytes, raw_bytes, params, mode);
 
-    check_cuda(cudaMalloc(reinterpret_cast<void**>(&d_adm_payload), max_adm_bytes), "cudaMalloc d_adm_payload");
-    check_cuda(cudaMalloc(reinterpret_cast<void**>(&d_entropy_payload), max_entropy_bytes), "cudaMalloc d_entropy_payload");
+    // [PhotonZip] scratch from a reusable workspace instead of cudaMalloc per call
+    WorkspaceLease ws(kMansPool);
+    std::uint8_t* d_adm_payload = ws->get<std::uint8_t>(0, max_adm_bytes);
+    std::uint8_t* d_entropy_payload = ws->get<std::uint8_t>(1, max_entropy_bytes);
 
     compress_adm_payload_device(d_input_data, length, params, d_adm_payload, adm_size, stream);
     if (adm_size > max_adm_bytes) {
@@ -171,9 +172,6 @@ void compress_internal_device(const void* d_input_data,
     }
     check_cuda(cudaStreamSynchronize(stream), "compress_internal_device sync");
     out_size = kMansHeaderBytes + entropy_size;
-
-    cudaFree(d_adm_payload);
-    cudaFree(d_entropy_payload);
 }
 
 void decompress_internal_device(const void* d_input_data,
@@ -225,10 +223,9 @@ void decompress_internal_device(const void* d_input_data,
     const auto* d_payload = static_cast<const std::uint8_t*>(d_input_data) + kMansHeaderBytes;
     const std::size_t payload_len = length - kMansHeaderBytes;
 
-    std::uint8_t* d_adm_payload = nullptr;
     std::size_t adm_size = 0;
-
-    check_cuda(cudaMalloc(reinterpret_cast<void**>(&d_adm_payload), max_adm_bytes), "cudaMalloc d_adm_payload");
+    WorkspaceLease ws(kMansPool);
+    std::uint8_t* d_adm_payload = ws->get<std::uint8_t>(2, max_adm_bytes);
 
     mans::nv::ans::decompress_stage_device(
         d_payload,
@@ -242,8 +239,6 @@ void decompress_internal_device(const void* d_input_data,
     decompress_adm_payload_device(d_adm_payload, adm_size, effective_params, d_out, raw_bytes, stream);
     check_cuda(cudaStreamSynchronize(stream), "decompress_internal_device sync");
     out_size = raw_bytes;
-
-    cudaFree(d_adm_payload);
 }
 
 void compress_internal(const void* input_data,
@@ -269,11 +264,9 @@ void compress_internal(const void* input_data,
     const std::size_t input_bytes = length * elem_size;
     const std::size_t max_output_bytes = get_max_compress_bytes(length, params);
 
-    std::uint8_t* d_input = nullptr;
-    std::uint8_t* d_output = nullptr;
-
-    check_cuda(cudaMalloc(reinterpret_cast<void**>(&d_input), input_bytes), "cudaMalloc d_input");
-    check_cuda(cudaMalloc(reinterpret_cast<void**>(&d_output), max_output_bytes), "cudaMalloc d_output");
+    WorkspaceLease ws(kMansHostPool);
+    std::uint8_t* d_input = ws->get<std::uint8_t>(0, input_bytes);
+    std::uint8_t* d_output = ws->get<std::uint8_t>(1, max_output_bytes);
     if (input_bytes != 0) {
         check_cuda(cudaMemcpy(d_input, input_data, input_bytes, cudaMemcpyHostToDevice),
                    "cudaMemcpy H2D raw input");
@@ -284,9 +277,6 @@ void compress_internal(const void* input_data,
         check_cuda(cudaMemcpy(out, d_output, out_size, cudaMemcpyDeviceToHost),
                    "cudaMemcpy D2H compressed output");
     }
-
-    cudaFree(d_input);
-    cudaFree(d_output);
 }
 
 void decompress_internal(const void* input_data,
@@ -304,11 +294,9 @@ void decompress_internal(const void* input_data,
     }
 
     const std::size_t raw_bytes = get_exact_decompress_bytes(input_data, length, params);
-    std::uint8_t* d_input = nullptr;
-    std::uint8_t* d_output = nullptr;
-
-    check_cuda(cudaMalloc(reinterpret_cast<void**>(&d_input), length), "cudaMalloc d_input");
-    check_cuda(cudaMalloc(reinterpret_cast<void**>(&d_output), raw_bytes), "cudaMalloc d_output");
+    WorkspaceLease ws(kMansHostPool);
+    std::uint8_t* d_input = ws->get<std::uint8_t>(2, length);
+    std::uint8_t* d_output = ws->get<std::uint8_t>(3, raw_bytes);
     check_cuda(cudaMemcpy(d_input, input_data, length, cudaMemcpyHostToDevice),
                "cudaMemcpy H2D compressed input");
 
@@ -317,9 +305,6 @@ void decompress_internal(const void* input_data,
         check_cuda(cudaMemcpy(out, d_output, out_size, cudaMemcpyDeviceToHost),
                    "cudaMemcpy D2H raw output");
     }
-
-    cudaFree(d_input);
-    cudaFree(d_output);
 }
 
 std::size_t get_max_compress_bytes(std::size_t num_elements,
